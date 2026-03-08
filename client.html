@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Course Platform - Real-time Test</title>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+        body { font-family: sans-serif; background: #f4f4f9; padding: 20px; }
+        .container { max-width: 600px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        #messages { height: 200px; border: 1px solid #ccc; overflow-y: scroll; margin-bottom: 10px; padding: 10px; background: #fafafa; }
+        input, button { padding: 10px; margin: 5px 0; width: 100%; box-sizing: border-box; }
+        .success { color: green; font-weight: bold; }
+        .error { color: red; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Real-time API Test</h2>
+        <div id="status">Status: Disconnected</div>
+        
+        <label>JWT Token (Get from Postman after login):</label>
+        <input type="text" id="token" placeholder="Paste your Bearer token here">
+        <button onclick="connect()">Connect to Socket</button>
+
+        <hr>
+
+        <div id="messages"></div>
+        <input type="text" id="msgInput" placeholder="Enter message to broadcast...">
+        <button onclick="sendMessage()">Send Broadcast Event</button>
+
+        <h3>Events Log:</h3>
+        <ul id="events"></ul>
+    </div>
+
+    <script>
+        let socket;
+        function log(msg, isError = false) {
+            const li = document.createElement('li');
+            li.textContent = msg;
+            if (isError) li.className = 'error';
+            document.getElementById('events').prepend(li);
+        }
+
+        function connect() {
+            const token = document.getElementById('token').value;
+            if (!token) return alert('Please provide a token!');
+
+            socket = io('http://localhost:5000', {
+                auth: { token }
+            });
+
+            socket.on('connect', () => {
+                document.getElementById('status').innerHTML = 'Status: <span class="success">Connected!</span>';
+                log('Connected to server');
+            });
+
+            socket.on('connect_error', (err) => {
+                document.getElementById('status').innerHTML = 'Status: <span class="error">Error: ' + err.message + '</span>';
+                log('Connection error: ' + err.message, true);
+            });
+
+            // Listen for Course:New notification
+            socket.on('course:new', (course) => {
+                log('🎉 New Course Created: ' + course.title);
+            });
+
+            // Listen for Progress notification
+            socket.on('enrollment:progress', (data) => {
+                log('📈 Progress Update: ' + data.progress + '% on course ID ' + data.courseId);
+            });
+
+            // Listen for Broadcast chat
+            socket.on('chat:message', (data) => {
+                const msgDiv = document.getElementById('messages');
+                msgDiv.innerHTML += `<div><b>${data.user}:</b> ${data.message}</div>`;
+                msgDiv.scrollTop = msgDiv.scrollHeight;
+            });
+        }
+
+        function sendMessage() {
+            if (!socket) return alert('Connect first!');
+            const message = document.getElementById('msgInput').value;
+            socket.emit('chat:send', { message });
+            document.getElementById('msgInput').value = '';
+        }
+    </script>
+</body>
+</html>
